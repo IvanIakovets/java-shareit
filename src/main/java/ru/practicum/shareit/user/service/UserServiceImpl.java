@@ -21,13 +21,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User createUser(UserDto userDto) {
-        log.info("Создание пользователя с email: {}", userDto.getEmail());
-
         // проверяем на null
         if (userDto == null) {
             log.warn("Попытка создания пользователя с пустыми данными");
             throw new ValidationException("Пользователь не может быть пустым");
         }
+
+        log.info("Создание пользователя с email: {}", userDto.getEmail());
 
         // проверяем уникальность email
         if (userRepository.existsByEmail(userDto.getEmail())) {

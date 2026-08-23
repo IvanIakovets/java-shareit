@@ -23,13 +23,13 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public Item createItem(Long userId, ItemDto itemDto) {
-        log.info("Создание вещи для пользователя id: {}, название: {}", userId, itemDto.getName());
-
         // проверка на null
         if (itemDto == null) {
             log.warn("Попытка создания вещи с пустыми данными");
             throw new ValidationException("Вещь не может быть пустой");
         }
+
+        log.info("Создание вещи для пользователя id: {}, название: {}", userId, itemDto.getName());
 
         // проверка существования пользователя
         userService.getUserById(userId);
