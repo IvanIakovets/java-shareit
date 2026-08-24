@@ -34,13 +34,6 @@ public class GlobalExceptionHandler {
                 .body(buildErrorResponse("Conflict", e.getMessage(), 409));
     }
 
-    @ExceptionHandler({ValidationException.class, BadRequestException.class})
-    public ResponseEntity<ErrorResponse> handleBadRequest(RuntimeException e) {
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(buildErrorResponse("Bad Request", e.getMessage(), 400));
-    }
-
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getAllErrors().stream()

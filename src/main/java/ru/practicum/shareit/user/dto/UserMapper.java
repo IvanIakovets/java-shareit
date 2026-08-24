@@ -3,25 +3,21 @@ package ru.practicum.shareit.user.dto;
 import ru.practicum.shareit.user.User;
 
 public class UserMapper {
-    public static UserDto toUserDto(User user) {
-        if (user == null) {
-            return null;
-        }
-        return new UserDto(
-                user.getId(),
-                user.getUsername(),
-                user.getEmail()
+    // создание
+    public static User toUser(UserRequestDto dto) {
+        return new User(
+                null,  // id генерируется в репозитории
+                dto.getName(),
+                dto.getEmail()
         );
     }
 
-    public static User toUser(UserDto userDto) {
-        if (userDto == null) {
-            return null;
-        }
-        return new User(
-                userDto.getId(),
-                userDto.getName(),
-                userDto.getEmail()
+    // для ответа
+    public static UserResponseDto toUserResponse(User user) {
+        return new UserResponseDto(
+                user.getId(),
+                user.getUsername(),
+                user.getEmail()
         );
     }
 }

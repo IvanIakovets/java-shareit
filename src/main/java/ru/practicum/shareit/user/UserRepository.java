@@ -2,10 +2,7 @@ package ru.practicum.shareit.user;
 
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Repository
@@ -17,8 +14,8 @@ public class UserRepository {
         return new ArrayList<>(users.values());
     }
 
-    public User findById(long id) {
-        return users.get(id);
+    public Optional<User> findById(long id) {
+        return Optional.ofNullable(users.get(id));
     }
 
     public User save(User user) {
@@ -36,17 +33,6 @@ public class UserRepository {
 
     public void delete(Long id) {
         users.remove(id);
-    }
-
-    public boolean existsById(Long id) {
-        return users.containsKey(id);
-    }
-
-    public User findByEmail(String email) {
-        return users.values().stream()
-                .filter(user -> user.getEmail().equals(email))
-                .findFirst()
-                .orElse(null);
     }
 
     public boolean existsByEmail(String email) {

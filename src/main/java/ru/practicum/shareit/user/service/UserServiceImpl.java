@@ -8,10 +8,11 @@ import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.exception.ValidationException;
 import ru.practicum.shareit.user.User;
 import ru.practicum.shareit.user.UserRepository;
-import ru.practicum.shareit.user.dto.UserDto;
 import ru.practicum.shareit.user.dto.UserMapper;
+import ru.practicum.shareit.user.dto.UserRequestDto;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -20,13 +21,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
 
     @Override
-    public User createUser(UserDto userDto) {
-        // проверяем на null
-        if (userDto == null) {
-            log.warn("Попытка создания пользователя с пустыми данными");
-            throw new ValidationException("Пользователь не может быть пустым");
-        }
-
+    public User createUser(UserRequestDto userDto) {
         log.info("Создание пользователя с email: {}", userDto.getEmail());
 
         // проверяем уникальность email
@@ -41,17 +36,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User updateUser(Long id, UserDto userDto) {
+    public User updateUser(Long id, UserRequestDto userDto) {
         log.info("Обновление пользователя с id: {}", id);
 
         // проверка существования пользователя
         User existingUser = getUserById(id);
-
-        // проверка на null
-        if (userDto == null) {
-            log.warn("Попытка обновления пользователя {} с пустыми данными", id);
-            throw new ValidationException("пользователь не может быть пустым");
-        }
 
         // частичное обновление
         if (userDto.getName() != null) {
@@ -77,12 +66,12 @@ public class UserServiceImpl implements UserService {
     public User getUserById(Long id) {
         log.debug("Получение пользователя по id: {}", id);
 
-        User user = userRepository.findById(id);
-        if (user == null) {
+        Optional<User> user = userRepository.findById(id);
+        if (user.isEmpty()) {
             log.warn("Пользователь с id {} не найден", id);
             throw new NotFoundException("Пользователь с таким " + id + " не найден");
         }
-        return user;
+        return user.get();
     }
 
     @Override

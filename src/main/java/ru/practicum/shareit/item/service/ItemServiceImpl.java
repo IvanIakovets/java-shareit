@@ -7,12 +7,13 @@ import ru.practicum.shareit.exception.AccessDeniedException;
 import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.exception.ValidationException;
 import ru.practicum.shareit.item.ItemRepository;
-import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.dto.ItemMapper;
+import ru.practicum.shareit.item.dto.ItemRequestDto;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.user.service.UserService;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -22,13 +23,7 @@ public class ItemServiceImpl implements ItemService {
     private final UserService userService;
 
     @Override
-    public Item createItem(Long userId, ItemDto itemDto) {
-        // проверка на null
-        if (itemDto == null) {
-            log.warn("Попытка создания вещи с пустыми данными");
-            throw new ValidationException("Вещь не может быть пустой");
-        }
-
+    public Item createItem(Long userId, ItemRequestDto itemDto) {
         log.info("Создание вещи для пользователя id: {}, название: {}", userId, itemDto.getName());
 
         // проверка существования пользователя
@@ -40,7 +35,7 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    public Item updateItem(Long itemId, Long userId, ItemDto itemDto) {
+    public Item updateItem(Long itemId, Long userId, ItemRequestDto itemDto) {
         log.info("Обновление вещи id: {} пользователем id: {}", itemId, userId);
 
         // проверка существования вещи
@@ -50,12 +45,6 @@ public class ItemServiceImpl implements ItemService {
         if (!existingItem.getOwnerId().equals(userId)) {
             log.warn("Пользователь {} попытался обновить вещь {} владельца {}", userId, itemId, existingItem.getOwnerId());
             throw new AccessDeniedException("Пользователь " + userId + " не является собственником " + itemId);
-        }
-
-        // проверка на null
-        if (itemDto == null) {
-            log.warn("Попытка обновления вещи {} с пустыми данными", itemId);
-            throw new ValidationException("Вещь не может быть пустой");
         }
 
         // частичное обновление
@@ -82,12 +71,12 @@ public class ItemServiceImpl implements ItemService {
     public Item getItemById(Long id) {
         log.debug("Получение вещи по id: {}", id);
 
-        Item item = itemRepository.findById(id);
-        if (item == null) {
+        Optional<Item> item = itemRepository.findById(id);
+        if (item.isEmpty()) {
             log.warn("Вещь с id {} не найдена", id);
             throw new NotFoundException("Вещь с таким id " + id + " не найдена");
         }
-        return item;
+        return item.get();
     }
 
     @Override
