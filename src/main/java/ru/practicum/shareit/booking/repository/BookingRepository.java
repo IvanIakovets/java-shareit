@@ -95,7 +95,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             "WHERE b.itemId = :itemId " +
             "AND b.bookerId = :userId " +
             "AND b.status = 'APPROVED' " +
-            "AND b.end < :now")
+            "AND b.end <= :now")
     boolean existsCompletedRental(@Param("itemId") Long itemId,
                                   @Param("userId") Long userId,
                                   @Param("now") LocalDateTime now);
