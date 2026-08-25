@@ -5,29 +5,27 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * TODO Sprint add-controllers.
- */
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "items")
+@Table(name = "comments")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class Item {
+public class Comment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private String name;
+    private String text;
+
+    @Column(name = "item_id", nullable = false)
+    private Long itemId;
+
+    @Column(name = "author_id", nullable = false)
+    private Long authorId;
 
     @Column(nullable = false)
-    private String description;
-
-    @Column(name = "is_available", nullable = false)
-    private Boolean available;
-
-    @Column(name = "owner_id", nullable = false)
-    private Long ownerId;
-
+    private LocalDateTime created;
 }
