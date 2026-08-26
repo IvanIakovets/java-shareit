@@ -33,7 +33,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     @Transactional
-    public Item createItem(Long userId, ItemRequestDto itemDto) {
+    public ItemResponseDto createItem(Long userId, ItemRequestDto itemDto) {
         log.info("Создание вещи для пользователя id: {}, название: {}", userId, itemDto.getName());
 
         // проверка существования пользователя
@@ -41,15 +41,17 @@ public class ItemServiceImpl implements ItemService {
 
         Item item = ItemMapper.toItem(itemDto, userId);
         log.info("Вещь успешно создана с id: {}, владелец: {}", item.getId(), userId);
-        return itemRepository.save(item);
+        itemRepository.save(item);
+
+        return ItemMapper.toItemResponse(item);
     }
 
     @Override
-    public Item updateItem(Long itemId, Long userId, ItemRequestDto itemDto) {
+    public ItemResponseDto updateItem(Long itemId, Long userId, ItemRequestDto itemDto) {
         log.info("Обновление вещи id: {} пользователем id: {}", itemId, userId);
 
         // проверка существования вещи
-        Item existingItem = getItemById(itemId);
+        Item existingItem = getItem(itemId);
 
         // проверка владельца
         if (!existingItem.getOwnerId().equals(userId)) {
@@ -74,29 +76,57 @@ public class ItemServiceImpl implements ItemService {
         }
 
         log.info("Вещь {} успешно обновлена пользователем {}", itemId, userId);
-        return itemRepository.save(existingItem);
+        itemRepository.save(existingItem);
+        return ItemMapper.toItemResponse(existingItem);
     }
 
     @Override
-    public Item getItemById(Long id) {
+    public ItemResponseDto getItemById(Long id) {
         log.debug("Получение вещи по id: {}", id);
 
-        return itemRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Вещь с таким id " + id + " не найдена"));
+        Item item = getItem(id);
+
+        return ItemMapper.toItemResponse(item);
     }
 
     @Override
-    public List<Item> getAllUserItems(Long userId) {
+    public List<ItemResponseDto> getAllUserItems(Long userId) {
         log.info("Получение всех вещей для пользователя id: {}", userId);
 
         // проверка существования пользователя
         userService.getUserById(userId);
 
-        return itemRepository.findAllByOwnerIdOrderByIdAsc(userId);
+        List<Item> items = itemRepository.findAllByOwnerIdOrderByIdAsc(userId);
+        LocalDateTime now = LocalDateTime.now();
+
+        return items.stream()
+                .map(item -> {
+                    // Получаем последнее завершённое бронирование
+                    Booking lastBooking = bookingRepository
+                            .findLastApprovedBookingByItemId(item.getId(), now)
+                            .orElse(null);
+
+                    // Получаем ближайшее будущее бронирование
+                    Booking nextBooking = bookingRepository
+                            .findNextApprovedBookingByItemId(item.getId(), now)
+                            .orElse(null);
+
+                    // Получаем комментарии
+                    List<Comment> comments = commentRepository.findAllByItemIdOrderByCreatedAsc(item.getId());
+                    List<CommentResponseDto> commentDtos = comments.stream()
+                            .map(comment -> {
+                                User author = userService.getUserById(comment.getAuthorId());
+                                return ItemMapper.toCommentResponse(comment, author);
+                            })
+                            .collect(Collectors.toList());
+
+                    return ItemMapper.toItemResponseWithBookingsAndComments(item, lastBooking, nextBooking, commentDtos);
+                })
+                .collect(Collectors.toList());
     }
 
     @Override
-    public List<Item> searchItems(String text) {
+    public List<ItemResponseDto> searchItems(String text) {
         log.info("Поиск вещей по тексту: '{}'", text);
 
         // если текст пустой или null - возвращаем пустой список
@@ -107,7 +137,9 @@ public class ItemServiceImpl implements ItemService {
 
         List<Item> items = itemRepository.searchByText(text);
         log.debug("Найдено {} вещей по тексту: '{}'", items.size(), text);
-        return items;
+        return items.stream()
+                .map(ItemMapper::toItemResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -115,7 +147,7 @@ public class ItemServiceImpl implements ItemService {
         log.info("Добавление комментария к вещи id: {} пользователем id: {}", itemId, userId);
 
         // Проверка существования вещи
-        getItemById(itemId);
+        getItem(itemId);
 
         // Проверка существования пользователя
         User user = userService.getUserById(userId);
@@ -143,7 +175,8 @@ public class ItemServiceImpl implements ItemService {
     public ItemResponseDto getItemWithDetails(Long itemId,  Long userId) {
         log.debug("Получение вещи с деталями по id: {} для пользователя: {}", itemId, userId);
 
-        Item item = getItemById(itemId);
+        Item item = getItem(itemId);
+
         LocalDateTime now = LocalDateTime.now();
 
         Booking lastBooking = null;
@@ -169,5 +202,10 @@ public class ItemServiceImpl implements ItemService {
 
         return ItemMapper.toItemResponseWithBookingsAndComments(
                 item, lastBooking, nextBooking, commentDtos);
+    }
+    @Override
+    public Item getItem(Long itemId) {
+        return itemRepository.findById(itemId)
+                .orElseThrow(() -> new NotFoundException("Вещь с таким id " + itemId + " не найдена"));
     }
 }

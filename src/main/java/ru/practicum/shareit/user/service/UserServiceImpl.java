@@ -51,11 +51,6 @@ public class UserServiceImpl implements UserService {
         }
 
         if (userDto.getEmail() != null) {
-            // проверка уникальности email при обновлении
-            if (userRepository.existsByEmailAndIdNot(userDto.getEmail(), id)) {
-                log.warn("Невозможно обновить email пользователя {} на {}: уже существует", id, userDto.getEmail());
-                throw new ConflictException("Пользователь с таким email " + userDto.getEmail() + " уже существует");
-            }
             log.debug("Обновление email пользователя {} с '{}' на '{}'", id, existingUser.getEmail(), userDto.getEmail());
             existingUser.setEmail(userDto.getEmail());
         }

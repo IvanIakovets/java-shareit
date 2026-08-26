@@ -35,7 +35,6 @@ public class UserController {
     }
 
     @GetMapping
-    @ResponseStatus(HttpStatus.OK)
     public List<UserResponseDto> getAll() {
         log.info("Получен GET запрос к /users");
 
@@ -47,7 +46,6 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @ResponseStatus(HttpStatus.OK)
     public UserResponseDto getById(@PathVariable Long id) {
         log.info("Получен GET запрос к /users/{}", id);
 
@@ -56,7 +54,6 @@ public class UserController {
     }
 
     @PatchMapping("/{id}")
-    @ResponseStatus(HttpStatus.OK)
     public UserResponseDto update(@PathVariable Long id,
                                           @Validated(ValidationGroups.Update.class) @RequestBody UserRequestDto userDto) {
         log.info("Получен PATCH запрос к /users/{}", id);
