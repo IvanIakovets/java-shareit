@@ -203,6 +203,7 @@ public class ItemServiceImpl implements ItemService {
         return ItemMapper.toItemResponseWithBookingsAndComments(
                 item, lastBooking, nextBooking, commentDtos);
     }
+
     @Override
     public Item getItem(Long itemId) {
         return itemRepository.findById(itemId)
