@@ -4,6 +4,7 @@ import ru.practicum.shareit.user.model.User;
 import ru.practicum.shareit.user.dto.UserRequestDto;
 
 import java.util.List;
+import java.util.Map;
 
 public interface UserService {
     User createUser(UserRequestDto userDto);
@@ -15,4 +16,6 @@ public interface UserService {
     List<User> getUsers();
 
     void deleteUser(Long id);
+
+    Map<Long, User> getUsersByIds(List<Long> userIds);
 }

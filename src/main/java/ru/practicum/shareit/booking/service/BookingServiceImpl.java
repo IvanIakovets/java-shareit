@@ -23,7 +23,6 @@ import ru.practicum.shareit.user.service.UserService;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -135,30 +134,15 @@ public class BookingServiceImpl implements BookingService {
         log.info("Получение бронирований пользователя id: {} со статусом: {}", userId, state);
 
         userService.getUserById(userId);
-
         LocalDateTime now = LocalDateTime.now();
 
         return switch (state) {
-            case ALL -> bookingRepository.findAllByBookerIdOrderByStartDesc(userId).stream()
-                    .map(this::toResponseDto)
-                    .collect(Collectors.toList());
-            case CURRENT -> bookingRepository.findCurrentByBookerId(userId, now).stream()
-                    .map(this::toResponseDto)
-                    .collect(Collectors.toList());
-            case FUTURE -> bookingRepository.findFutureByBookerId(userId, now).stream()
-                    .map(this::toResponseDto)
-                    .collect(Collectors.toList());
-            case PAST -> bookingRepository.findPastByBookerId(userId, now).stream()
-                    .map(this::toResponseDto)
-                    .collect(Collectors.toList());
-            case WAITING ->
-                    bookingRepository.findAllByBookerIdAndStatusOrderByStartDesc(userId, BookingStatus.WAITING).stream()
-                            .map(this::toResponseDto)
-                            .collect(Collectors.toList());
-            case REJECTED ->
-                    bookingRepository.findAllByBookerIdAndStatusOrderByStartDesc(userId, BookingStatus.REJECTED).stream()
-                            .map(this::toResponseDto)
-                            .collect(Collectors.toList());
+            case ALL -> bookingRepository.findAllByBookerIdDto(userId);
+            case CURRENT -> bookingRepository.findCurrentByBookerIdDto(userId, now);
+            case FUTURE -> bookingRepository.findFutureByBookerIdDto(userId, now);
+            case PAST -> bookingRepository.findPastByBookerIdDto(userId, now);
+            case WAITING -> bookingRepository.findAllByBookerIdAndStatusDto(userId, BookingStatus.WAITING);
+            case REJECTED -> bookingRepository.findAllByBookerIdAndStatusDto(userId, BookingStatus.REJECTED);
         };
     }
 
@@ -177,24 +161,12 @@ public class BookingServiceImpl implements BookingService {
         LocalDateTime now = LocalDateTime.now();
 
         return switch (state) {
-            case ALL -> bookingRepository.findAllByOwnerId(userId).stream()
-                    .map(this::toResponseDto)
-                    .collect(Collectors.toList());
-            case CURRENT -> bookingRepository.findCurrentByOwnerId(userId, now).stream()
-                    .map(this::toResponseDto)
-                    .collect(Collectors.toList());
-            case FUTURE -> bookingRepository.findFutureByOwnerId(userId, now).stream()
-                    .map(this::toResponseDto)
-                    .collect(Collectors.toList());
-            case PAST -> bookingRepository.findPastByOwnerId(userId, now).stream()
-                    .map(this::toResponseDto)
-                    .collect(Collectors.toList());
-            case WAITING -> bookingRepository.findAllByOwnerIdAndStatus(userId, BookingStatus.WAITING).stream()
-                    .map(this::toResponseDto)
-                    .collect(Collectors.toList());
-            case REJECTED -> bookingRepository.findAllByOwnerIdAndStatus(userId, BookingStatus.REJECTED).stream()
-                    .map(this::toResponseDto)
-                    .collect(Collectors.toList());
+            case ALL -> bookingRepository.findAllByOwnerIdDto(userId);
+            case CURRENT -> bookingRepository.findCurrentByOwnerIdDto(userId, now);
+            case FUTURE -> bookingRepository.findFutureByOwnerIdDto(userId, now);
+            case PAST -> bookingRepository.findPastByOwnerIdDto(userId, now);
+            case WAITING -> bookingRepository.findAllByOwnerIdAndStatusDto(userId, BookingStatus.WAITING);
+            case REJECTED -> bookingRepository.findAllByOwnerIdAndStatusDto(userId, BookingStatus.REJECTED);
         };
     }
 
@@ -204,11 +176,5 @@ public class BookingServiceImpl implements BookingService {
                     log.warn("Бронирование с id {} не найдено", bookingId);
                     return new NotFoundException("Бронирование с id " + bookingId + " не найдено");
                 });
-    }
-
-    private BookingResponseDto  toResponseDto(Booking booking) {
-        Item item = itemService.getItem(booking.getItemId());
-        User booker = userService.getUserById(booking.getBookerId());
-        return BookingMapper.toResponse(booking, item, booker);
     }
 }

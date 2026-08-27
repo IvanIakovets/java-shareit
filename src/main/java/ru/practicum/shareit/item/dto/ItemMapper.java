@@ -35,44 +35,38 @@ public class ItemMapper {
     }
 
     public static ItemResponseDto toItemResponseWithBookingsAndComments(
-        Item item,
-        Booking lastBooking,
-        Booking nextBooking,
-        List<CommentResponseDto> comments) {
-            if (item == null) {
-                return null;
-            }
+            Item item,
+            Booking lastBooking,
+            Booking nextBooking,
+            List<CommentResponseDto> comments) {
 
-            BookingInfoDto lastBookingDto = null;
-            BookingInfoDto nextBookingDto = null;
+        BookingInfoDto lastBookingDto = lastBooking != null
+                ? new BookingInfoDto(
+                lastBooking.getId(),
+                lastBooking.getBookerId(),
+                lastBooking.getStart(),
+                lastBooking.getEnd()
+        )
+                : null;
 
-            if (lastBooking != null) {
-                lastBookingDto = new BookingInfoDto(
-                        lastBooking.getId(),
-                        lastBooking.getBookerId(),
-                        lastBooking.getStart(),
-                        lastBooking.getEnd()
-                );
-            }
+        BookingInfoDto nextBookingDto = nextBooking != null
+                ? new BookingInfoDto(
+                nextBooking.getId(),
+                nextBooking.getBookerId(),
+                nextBooking.getStart(),
+                nextBooking.getEnd()
+        )
+                : null;
 
-            if (nextBooking != null) {
-                nextBookingDto = new BookingInfoDto(
-                        nextBooking.getId(),
-                        nextBooking.getBookerId(),
-                        nextBooking.getStart(),
-                        nextBooking.getEnd()
-                );
-            }
-
-            return new ItemResponseDto(
-                    item.getId(),
-                    item.getName(),
-                    item.getDescription(),
-                    item.getAvailable(),
-                    lastBookingDto,
-                    nextBookingDto,
-                    comments != null ? comments : new ArrayList<>()
-            );
+        return new ItemResponseDto(
+                item.getId(),
+                item.getName(),
+                item.getDescription(),
+                item.getAvailable(),
+                lastBookingDto,
+                nextBookingDto,
+                comments
+        );
     }
 
     public static Comment toComment(CommentRequestDto dto, Long itemId, Long authorId) {
@@ -85,6 +79,23 @@ public class ItemMapper {
                 itemId,
                 authorId,
                 LocalDateTime.now()
+        );
+    }
+
+    public static ItemResponseDto toItemResponseWithBookingInfo(
+            Item item,
+            BookingInfoDto lastBooking,
+            BookingInfoDto nextBooking,
+            List<CommentResponseDto> comments) {
+
+        return new ItemResponseDto(
+                item.getId(),
+                item.getName(),
+                item.getDescription(),
+                item.getAvailable(),
+                lastBooking,
+                nextBooking,
+                comments
         );
     }
 

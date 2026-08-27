@@ -18,7 +18,9 @@ import ru.practicum.shareit.user.model.User;
 import ru.practicum.shareit.user.service.UserService;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -96,31 +98,69 @@ public class ItemServiceImpl implements ItemService {
         // проверка существования пользователя
         userService.getUserById(userId);
 
-        List<Item> items = itemRepository.findAllByOwnerIdOrderByIdAsc(userId);
         LocalDateTime now = LocalDateTime.now();
 
-        return items.stream()
-                .map(item -> {
-                    // Получаем последнее завершённое бронирование
-                    Booking lastBooking = bookingRepository
-                            .findLastApprovedBookingByItemId(item.getId(), now)
-                            .orElse(null);
+        List<Object[]> results = itemRepository.findItemsWithLastAndNextBookings(userId, now);
 
-                    // Получаем ближайшее будущее бронирование
-                    Booking nextBooking = bookingRepository
-                            .findNextApprovedBookingByItemId(item.getId(), now)
-                            .orElse(null);
+        if (results.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-                    // Получаем комментарии
-                    List<Comment> comments = commentRepository.findAllByItemIdOrderByCreatedAsc(item.getId());
-                    List<CommentResponseDto> commentDtos = comments.stream()
+        List<Long> itemIds = results.stream()
+                .map(row -> ((Item) row[0]).getId())
+                .collect(Collectors.toList());
+
+        List<Comment> allComments = commentRepository.findAllByItemIds(itemIds);
+
+        Map<Long, List<Comment>> commentsByItemId = allComments.stream()
+                .collect(Collectors.groupingBy(Comment::getItemId));
+
+        List<Long> authorIds = allComments.stream()
+                .map(Comment::getAuthorId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<Long, User> usersById = userService.getUsersByIds(authorIds);
+
+        return results.stream()
+                .map(row -> {
+                    Item item = (Item) row[0];
+
+                    // Данные о последнем бронировании
+                    Long lastBookingId = (Long) row[1];
+                    Long lastBookerId = (Long) row[2];
+                    LocalDateTime lastStartDate = (LocalDateTime) row[3];
+                    LocalDateTime lastEndDate = (LocalDateTime) row[4];
+
+                    // Данные о следующем бронировании
+                    Long nextBookingId = (Long) row[5];
+                    Long nextBookerId = (Long) row[6];
+                    LocalDateTime nextStartDate = (LocalDateTime) row[7];
+                    LocalDateTime nextEndDate = (LocalDateTime) row[8];
+
+                    // Формируем DTO для бронирований
+                    BookingInfoDto lastBookingDto = lastBookingId != null
+                            ? new BookingInfoDto(lastBookingId, lastBookerId, lastStartDate, lastEndDate)
+                            : null;
+
+                    BookingInfoDto nextBookingDto = nextBookingId != null
+                            ? new BookingInfoDto(nextBookingId, nextBookerId, nextStartDate, nextEndDate)
+                            : null;
+
+                    // Получаем комментарии для текущей вещи
+                    List<Comment> itemComments = commentsByItemId.getOrDefault(item.getId(), Collections.emptyList());
+
+                    // Преобразуем комментарии в DTO
+                    List<CommentResponseDto> commentDtos = itemComments.stream()
                             .map(comment -> {
-                                User author = userService.getUserById(comment.getAuthorId());
+                                User author = usersById.get(comment.getAuthorId());
                                 return ItemMapper.toCommentResponse(comment, author);
                             })
                             .collect(Collectors.toList());
 
-                    return ItemMapper.toItemResponseWithBookingsAndComments(item, lastBooking, nextBooking, commentDtos);
+                    // Формируем ItemResponseDto через существующий маппер
+                    return ItemMapper.toItemResponseWithBookingInfo(
+                            item, lastBookingDto, nextBookingDto, commentDtos);
                 })
                 .collect(Collectors.toList());
     }

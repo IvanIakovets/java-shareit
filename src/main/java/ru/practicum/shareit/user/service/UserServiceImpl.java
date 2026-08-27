@@ -11,7 +11,10 @@ import ru.practicum.shareit.user.repository.UserRepository;
 import ru.practicum.shareit.user.dto.UserMapper;
 import ru.practicum.shareit.user.dto.UserRequestDto;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -81,5 +84,14 @@ public class UserServiceImpl implements UserService {
         log.info("Удаление пользователя с id: {}", id);
         getUserById(id);
         userRepository.deleteById(id);
+    }
+
+    @Override
+    public Map<Long, User> getUsersByIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, user -> user));
     }
 }

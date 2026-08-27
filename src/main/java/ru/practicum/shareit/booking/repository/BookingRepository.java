@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import ru.practicum.shareit.booking.dto.BookingResponseDto;
 import ru.practicum.shareit.booking.model.Booking;
 import ru.practicum.shareit.booking.model.BookingStatus;
 
@@ -13,63 +14,164 @@ import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-    // Все бронирования пользователя
-    List<Booking> findAllByBookerIdOrderByStartDesc(Long bookerId);
 
-    // Текущие бронирования пользователя
-    @Query("SELECT b FROM Booking b WHERE b.bookerId = :userId " +
+    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
+            "b.id, " +
+            "b.start, " +
+            "b.end, " +
+            "b.status, " +
+            "new ru.practicum.shareit.booking.dto.BookerDto(u.id, u.username), " +
+            "new ru.practicum.shareit.booking.dto.ItemDto(i.id, i.name)) " +
+            "FROM Booking b " +
+            "JOIN User u ON b.bookerId = u.id " +
+            "JOIN Item i ON b.itemId = i.id " +
+            "WHERE b.bookerId = :userId " +
+            "ORDER BY b.start DESC")
+    List<BookingResponseDto> findAllByBookerIdDto(@Param("userId") Long userId);
+
+    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
+            "b.id, " +
+            "b.start, " +
+            "b.end, " +
+            "b.status, " +
+            "new ru.practicum.shareit.booking.dto.BookerDto(u.id, u.username), " +
+            "new ru.practicum.shareit.booking.dto.ItemDto(i.id, i.name)) " +
+            "FROM Booking b " +
+            "JOIN User u ON b.bookerId = u.id " +
+            "JOIN Item i ON b.itemId = i.id " +
+            "WHERE b.bookerId = :userId " +
             "AND b.start <= :now AND b.end >= :now " +
             "ORDER BY b.start DESC")
-    List<Booking> findCurrentByBookerId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+    List<BookingResponseDto> findCurrentByBookerIdDto(@Param("userId") Long userId,
+                                                      @Param("now") LocalDateTime now);
 
-    // Будущие бронирования пользователя
-    @Query("SELECT b FROM Booking b WHERE b.bookerId = :userId " +
+    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
+            "b.id, " +
+            "b.start, " +
+            "b.end, " +
+            "b.status, " +
+            "new ru.practicum.shareit.booking.dto.BookerDto(u.id, u.username), " +
+            "new ru.practicum.shareit.booking.dto.ItemDto(i.id, i.name)) " +
+            "FROM Booking b " +
+            "JOIN User u ON b.bookerId = u.id " +
+            "JOIN Item i ON b.itemId = i.id " +
+            "WHERE b.bookerId = :userId " +
             "AND b.start > :now " +
             "ORDER BY b.start DESC")
-    List<Booking> findFutureByBookerId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+    List<BookingResponseDto> findFutureByBookerIdDto(@Param("userId") Long userId,
+                                                     @Param("now") LocalDateTime now);
 
-    // Прошлые бронирования пользователя
-    @Query("SELECT b FROM Booking b WHERE b.bookerId = :userId " +
+    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
+            "b.id, " +
+            "b.start, " +
+            "b.end, " +
+            "b.status, " +
+            "new ru.practicum.shareit.booking.dto.BookerDto(u.id, u.username), " +
+            "new ru.practicum.shareit.booking.dto.ItemDto(i.id, i.name)) " +
+            "FROM Booking b " +
+            "JOIN User u ON b.bookerId = u.id " +
+            "JOIN Item i ON b.itemId = i.id " +
+            "WHERE b.bookerId = :userId " +
             "AND b.end < :now " +
             "ORDER BY b.start DESC")
-    List<Booking> findPastByBookerId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+    List<BookingResponseDto> findPastByBookerIdDto(@Param("userId") Long userId,
+                                                   @Param("now") LocalDateTime now);
 
-    // Бронирования пользователя по статусу
-    List<Booking> findAllByBookerIdAndStatusOrderByStartDesc(Long bookerId, BookingStatus status);
-
-    // Все бронирования вещей владельца
-    @Query("SELECT b FROM Booking b WHERE b.itemId IN " +
-            "(SELECT i.id FROM Item i WHERE i.ownerId = :ownerId) " +
-            "ORDER BY b.start DESC")
-    List<Booking> findAllByOwnerId(@Param("ownerId") Long ownerId);
-
-    // Текущие бронирования вещей владельца
-    @Query("SELECT b FROM Booking b WHERE b.itemId IN " +
-            "(SELECT i.id FROM Item i WHERE i.ownerId = :ownerId) " +
-            "AND b.start <= :now AND b.end >= :now " +
-            "ORDER BY b.start DESC")
-    List<Booking> findCurrentByOwnerId(@Param("ownerId") Long ownerId, @Param("now") LocalDateTime now);
-
-    // Будущие бронирования вещей владельца
-    @Query("SELECT b FROM Booking b WHERE b.itemId IN " +
-            "(SELECT i.id FROM Item i WHERE i.ownerId = :ownerId) " +
-            "AND b.start > :now " +
-            "ORDER BY b.start DESC")
-    List<Booking> findFutureByOwnerId(@Param("ownerId") Long ownerId, @Param("now") LocalDateTime now);
-
-    // Прошлые бронирования вещей владельца
-    @Query("SELECT b FROM Booking b WHERE b.itemId IN " +
-            "(SELECT i.id FROM Item i WHERE i.ownerId = :ownerId) " +
-            "AND b.end < :now " +
-            "ORDER BY b.start DESC")
-    List<Booking> findPastByOwnerId(@Param("ownerId") Long ownerId, @Param("now") LocalDateTime now);
-
-    // Бронирования вещей владельца по статусу
-    @Query("SELECT b FROM Booking b WHERE b.itemId IN " +
-            "(SELECT i.id FROM Item i WHERE i.ownerId = :ownerId) " +
+    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
+            "b.id, " +
+            "b.start, " +
+            "b.end, " +
+            "b.status, " +
+            "new ru.practicum.shareit.booking.dto.BookerDto(u.id, u.username), " +
+            "new ru.practicum.shareit.booking.dto.ItemDto(i.id, i.name)) " +
+            "FROM Booking b " +
+            "JOIN User u ON b.bookerId = u.id " +
+            "JOIN Item i ON b.itemId = i.id " +
+            "WHERE b.bookerId = :userId " +
             "AND b.status = :status " +
             "ORDER BY b.start DESC")
-    List<Booking> findAllByOwnerIdAndStatus(@Param("ownerId") Long ownerId, @Param("status") BookingStatus status);
+    List<BookingResponseDto> findAllByBookerIdAndStatusDto(@Param("userId") Long userId,
+                                                           @Param("status") BookingStatus status);
+
+    // ===== МЕТОДЫ ДЛЯ ВЛАДЕЛЬЦА (OWNER) =====
+
+    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
+            "b.id, " +
+            "b.start, " +
+            "b.end, " +
+            "b.status, " +
+            "new ru.practicum.shareit.booking.dto.BookerDto(u.id, u.username), " +
+            "new ru.practicum.shareit.booking.dto.ItemDto(i.id, i.name)) " +
+            "FROM Booking b " +
+            "JOIN User u ON b.bookerId = u.id " +
+            "JOIN Item i ON b.itemId = i.id " +
+            "WHERE i.ownerId = :userId " +
+            "ORDER BY b.start DESC")
+    List<BookingResponseDto> findAllByOwnerIdDto(@Param("userId") Long userId);
+
+    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
+            "b.id, " +
+            "b.start, " +
+            "b.end, " +
+            "b.status, " +
+            "new ru.practicum.shareit.booking.dto.BookerDto(u.id, u.username), " +
+            "new ru.practicum.shareit.booking.dto.ItemDto(i.id, i.name)) " +
+            "FROM Booking b " +
+            "JOIN User u ON b.bookerId = u.id " +
+            "JOIN Item i ON b.itemId = i.id " +
+            "WHERE i.ownerId = :userId " +
+            "AND b.start <= :now AND b.end >= :now " +
+            "ORDER BY b.start DESC")
+    List<BookingResponseDto> findCurrentByOwnerIdDto(@Param("userId") Long userId,
+                                                     @Param("now") LocalDateTime now);
+
+    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
+            "b.id, " +
+            "b.start, " +
+            "b.end, " +
+            "b.status, " +
+            "new ru.practicum.shareit.booking.dto.BookerDto(u.id, u.username), " +
+            "new ru.practicum.shareit.booking.dto.ItemDto(i.id, i.name)) " +
+            "FROM Booking b " +
+            "JOIN User u ON b.bookerId = u.id " +
+            "JOIN Item i ON b.itemId = i.id " +
+            "WHERE i.ownerId = :userId " +
+            "AND b.start > :now " +
+            "ORDER BY b.start DESC")
+    List<BookingResponseDto> findFutureByOwnerIdDto(@Param("userId") Long userId,
+                                                    @Param("now") LocalDateTime now);
+
+    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
+            "b.id, " +
+            "b.start, " +
+            "b.end, " +
+            "b.status, " +
+            "new ru.practicum.shareit.booking.dto.BookerDto(u.id, u.username), " +
+            "new ru.practicum.shareit.booking.dto.ItemDto(i.id, i.name)) " +
+            "FROM Booking b " +
+            "JOIN User u ON b.bookerId = u.id " +
+            "JOIN Item i ON b.itemId = i.id " +
+            "WHERE i.ownerId = :userId " +
+            "AND b.end < :now " +
+            "ORDER BY b.start DESC")
+    List<BookingResponseDto> findPastByOwnerIdDto(@Param("userId") Long userId,
+                                                  @Param("now") LocalDateTime now);
+
+    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
+            "b.id, " +
+            "b.start, " +
+            "b.end, " +
+            "b.status, " +
+            "new ru.practicum.shareit.booking.dto.BookerDto(u.id, u.username), " +
+            "new ru.practicum.shareit.booking.dto.ItemDto(i.id, i.name)) " +
+            "FROM Booking b " +
+            "JOIN User u ON b.bookerId = u.id " +
+            "JOIN Item i ON b.itemId = i.id " +
+            "WHERE i.ownerId = :userId " +
+            "AND b.status = :status " +
+            "ORDER BY b.start DESC")
+    List<BookingResponseDto> findAllByOwnerIdAndStatusDto(@Param("userId") Long userId,
+                                                          @Param("status") BookingStatus status);
 
     // поиск последнего подтвержение бронирования по вещи
     @Query("SELECT b FROM Booking b " +
@@ -80,7 +182,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             "LIMIT 1")
     Optional<Booking> findLastApprovedBookingByItemId(@Param("itemId") Long itemId,
                                                       @Param("now") LocalDateTime now);
-
     // поиск будущего бронирования по вещи
     @Query("SELECT b FROM Booking b " +
             "WHERE b.itemId = :itemId " +
@@ -95,7 +196,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             "WHERE b.itemId = :itemId " +
             "AND b.bookerId = :userId " +
             "AND b.status = 'APPROVED' " +
-            "AND b.end <= :now")
+            "AND b.end < :now")
     boolean existsCompletedRental(@Param("itemId") Long itemId,
                                   @Param("userId") Long userId,
                                   @Param("now") LocalDateTime now);
