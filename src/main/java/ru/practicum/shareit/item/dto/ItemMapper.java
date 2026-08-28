@@ -90,7 +90,7 @@ public class ItemMapper {
         return new CommentResponseDto(
                 comment.getId(),
                 comment.getText(),
-                author.getUsername(),
+                author.getName(),
                 comment.getCreated()
         );
     }

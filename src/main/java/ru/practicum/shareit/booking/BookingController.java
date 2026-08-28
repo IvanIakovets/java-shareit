@@ -9,13 +9,10 @@ import ru.practicum.shareit.booking.dto.BookingRequestDto;
 import ru.practicum.shareit.booking.dto.BookingResponseDto;
 import ru.practicum.shareit.booking.model.BookingState;
 import ru.practicum.shareit.booking.service.BookingService;
+import ru.practicum.shareit.exception.BadRequestException;
 
 import java.util.List;
-import java.util.Optional;
 
-/**
- * TODO Sprint add-bookings.
- */
 @Slf4j
 @RestController
 @RequestMapping(path = "/bookings")
@@ -53,21 +50,29 @@ public class BookingController {
     @GetMapping
     public List<BookingResponseDto> getUserBookings(
             @RequestHeader("X-Sharer-User-Id") Long userId,
-            @RequestParam(defaultValue = "ALL") String state) {
+            @RequestParam(defaultValue = "ALL") String state,
+            @RequestParam(defaultValue = "0") int from,
+            @RequestParam(defaultValue = "20") int size) {
         log.info("Получен GET запрос к /bookings от пользователя: {} со статусом: {}", userId, state);
 
-        Optional<BookingState> bookingState = BookingState.from(state);
-        return bookingService.getUserBookings(userId, bookingState.orElse(null));
+        BookingState bookingState = BookingState.from(state)
+                .orElseThrow(() -> new BadRequestException("Неизвестные параметр: " + state));
+
+        return bookingService.getUserBookings(userId, bookingState, from, size);
     }
 
     @GetMapping("/owner")
     public List<BookingResponseDto> getOwnerBookings(
             @RequestHeader("X-Sharer-User-Id") Long userId,
-            @RequestParam(defaultValue = "ALL") String state) {
+            @RequestParam(defaultValue = "ALL") String state,
+            @RequestParam(defaultValue = "0") int from,
+            @RequestParam(defaultValue = "20") int size) {
         log.info("Получен GET запрос к /bookings/owner от пользователя: {} со статусом: {}", userId, state);
 
-        Optional<BookingState> bookingState = BookingState.from(state);
-        return bookingService.getOwnerBookings(userId, bookingState.orElse(null));
+        BookingState bookingState = BookingState.from(state)
+                .orElseThrow(() -> new BadRequestException("Unknown state: " + state));
+
+        return bookingService.getOwnerBookings(userId, bookingState, from, size);
     }
 
 }

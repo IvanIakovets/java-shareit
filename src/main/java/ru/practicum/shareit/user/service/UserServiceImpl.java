@@ -49,8 +49,8 @@ public class UserServiceImpl implements UserService {
 
         // частичное обновление
         if (userDto.getName() != null) {
-            log.debug("Обновление имени пользователя {} с '{}' на '{}'", id, existingUser.getUsername(), userDto.getName());
-            existingUser.setUsername(userDto.getName());
+            log.debug("Обновление имени пользователя {} с '{}' на '{}'", id, existingUser.getName(), userDto.getName());
+            existingUser.setName(userDto.getName());
         }
 
         if (userDto.getEmail() != null) {

@@ -8,9 +8,6 @@ import ru.practicum.shareit.user.model.User;
 
 import java.util.List;
 
-/**
- * TODO Sprint add-controllers.
- */
 @Entity
 @Table(name = "items")
 @Data

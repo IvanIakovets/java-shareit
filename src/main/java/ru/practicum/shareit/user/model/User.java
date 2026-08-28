@@ -11,9 +11,6 @@ import ru.practicum.shareit.item.model.Item;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * TODO Sprint add-controllers.
- */
 @Entity
 @Table(name = "users")
 @Data
@@ -24,8 +21,8 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String username;
+    @Column(name = "name", nullable = false)
+    private String name;
 
     @Column(unique = true, nullable = false)
     private String email;

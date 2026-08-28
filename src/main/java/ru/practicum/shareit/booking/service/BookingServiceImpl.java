@@ -2,6 +2,10 @@ package ru.practicum.shareit.booking.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.dto.BookingMapper;
@@ -15,7 +19,6 @@ import ru.practicum.shareit.exception.AccessDeniedException;
 import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.exception.BadRequestException;
 import ru.practicum.shareit.exception.ValidationException;
-import ru.practicum.shareit.item.dto.ItemResponseDto;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.item.service.ItemService;
 import ru.practicum.shareit.user.model.User;
@@ -39,7 +42,6 @@ public class BookingServiceImpl implements BookingService {
         log.info("Создание бронирования для пользователя id: {}", userId);
 
         User user = userService.getUserById(userId);
-
         Item item = itemService.getItem(bookingDto.getItemId());
 
         if (item.getOwner().getId().equals(userId)) {
@@ -94,7 +96,6 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = getBookingByIdInternal(bookingId);
         Item item = booking.getItem();
 
-
         if (!item.getOwner().getId().equals(userId)) {
             log.warn("Пользователь {} не является владельцем вещи {}", userId, item.getId());
             throw new AccessDeniedException("Только владелец может подтверждать или отклонять бронирование");
@@ -130,44 +131,55 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    public List<BookingResponseDto> getUserBookings(Long userId, BookingState state) {
+    public List<BookingResponseDto> getUserBookings(Long userId, BookingState state, int from, int size) {
         log.info("Получение бронирований пользователя id: {} со статусом: {}", userId, state);
 
         userService.getUserById(userId);
         LocalDateTime now = LocalDateTime.now();
+        Pageable pageable = createPageable(from, size);
 
-        return switch (state) {
-            case ALL -> bookingRepository.findAllByBookerIdDto(userId);
-            case CURRENT -> bookingRepository.findCurrentByBookerIdDto(userId, now);
-            case FUTURE -> bookingRepository.findFutureByBookerIdDto(userId, now);
-            case PAST -> bookingRepository.findPastByBookerIdDto(userId, now);
-            case WAITING -> bookingRepository.findAllByBookerIdAndStatusDto(userId, BookingStatus.WAITING);
-            case REJECTED -> bookingRepository.findAllByBookerIdAndStatusDto(userId, BookingStatus.REJECTED);
+        Page<Booking> page = switch (state) {
+            case ALL -> bookingRepository.findByBookerId(userId, pageable);
+            case WAITING -> bookingRepository.findByBookerIdAndStatus(userId, BookingStatus.WAITING, pageable);
+            case REJECTED -> bookingRepository.findByBookerIdAndStatus(userId, BookingStatus.REJECTED, pageable);
+            case CURRENT -> bookingRepository.findByBookerIdAndStartBeforeAndEndAfter(userId, now, now, pageable);
+            case PAST -> bookingRepository.findByBookerIdAndEndBefore(userId, now, pageable);
+            case FUTURE -> bookingRepository.findByBookerIdAndStartAfter(userId, now, pageable);
         };
+
+        // @EntityGraph уже загрузил item и booker, поэтому N+1 не будет
+        return page.getContent().stream()
+                .map(booking -> BookingMapper.toResponse(booking, booking.getItem(), booking.getBooker()))
+                .toList();
     }
 
     @Override
-    public List<BookingResponseDto> getOwnerBookings(Long userId, BookingState state) {
+    public List<BookingResponseDto> getOwnerBookings(Long userId, BookingState state, int from, int size) {
         log.info("Получение бронирований вещей владельца id: {} со статусом: {}", userId, state);
 
         userService.getUserById(userId);
 
-        List<ItemResponseDto> userItems = itemService.getAllUserItems(userId);
-        if (userItems.isEmpty()) {
+        if (!bookingRepository.existsByOwnerId(userId)) {
             log.warn("Пользователь {} не владеет ни одной вещью", userId);
             throw new ValidationException("У пользователя нет вещей для просмотра бронирований");
         }
 
         LocalDateTime now = LocalDateTime.now();
+        Pageable pageable = createPageable(from, size);
 
-        return switch (state) {
-            case ALL -> bookingRepository.findAllByOwnerIdDto(userId);
-            case CURRENT -> bookingRepository.findCurrentByOwnerIdDto(userId, now);
-            case FUTURE -> bookingRepository.findFutureByOwnerIdDto(userId, now);
-            case PAST -> bookingRepository.findPastByOwnerIdDto(userId, now);
-            case WAITING -> bookingRepository.findAllByOwnerIdAndStatusDto(userId, BookingStatus.WAITING);
-            case REJECTED -> bookingRepository.findAllByOwnerIdAndStatusDto(userId, BookingStatus.REJECTED);
+        Page<Booking> page = switch (state) {
+            case ALL -> bookingRepository.findByItemOwnerId(userId, pageable);
+            case WAITING -> bookingRepository.findByItemOwnerIdAndStatus(userId, BookingStatus.WAITING, pageable);
+            case REJECTED -> bookingRepository.findByItemOwnerIdAndStatus(userId, BookingStatus.REJECTED, pageable);
+            case CURRENT -> bookingRepository.findByItemOwnerIdAndStartBeforeAndEndAfter(userId, now, now, pageable);
+            case PAST -> bookingRepository.findByItemOwnerIdAndEndBefore(userId, now, pageable);
+            case FUTURE -> bookingRepository.findByItemOwnerIdAndStartAfter(userId, now, pageable);
         };
+
+        // @EntityGraph уже загрузил item и booker, поэтому N+1 не будет
+        return page.getContent().stream()
+                .map(booking -> BookingMapper.toResponse(booking, booking.getItem(), booking.getBooker()))
+                .toList();
     }
 
     private Booking getBookingByIdInternal(Long bookingId) {
@@ -176,5 +188,9 @@ public class BookingServiceImpl implements BookingService {
                     log.warn("Бронирование с id {} не найдено", bookingId);
                     return new NotFoundException("Бронирование с id " + bookingId + " не найдено");
                 });
+    }
+
+    private Pageable createPageable(int from, int size) {
+        return PageRequest.of(from / size, size, Sort.by("start").descending());
     }
 }

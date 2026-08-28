@@ -12,9 +12,6 @@ import ru.practicum.shareit.validation.ValidationGroups;
 
 import java.util.List;
 
-/**
- * TODO Sprint add-controllers.
- */
 @Slf4j
 @RestController
 @RequestMapping("/items")
@@ -50,18 +47,22 @@ public class ItemController {
 
     @GetMapping
     public List<ItemResponseDto> getAllByOwner(
-            @RequestHeader("X-Sharer-User-Id") Long userId) {
-        log.info("Получен GET запрос к /items от пользователя: {}", userId);
-        return itemService.getAllUserItems(userId);
+            @RequestHeader("X-Sharer-User-Id") Long userId,
+            @RequestParam(defaultValue = "0") int from,
+            @RequestParam(defaultValue = "20") int size) {
+        log.info("Получен GET запрос к /items от пользователя: {} с пагинацией from={}, size={}", userId, from, size);
+        return itemService.getAllUserItems(userId, from, size);
     }
 
 
 
     @GetMapping("/search")
     public List<ItemResponseDto> search(
-            @RequestParam(name = "text", required = false) String text) {
-        log.info("Получен GET запрос к /items/search с текстом: '{}'", text);
-        return itemService.searchItems(text);
+            @RequestParam(name = "text", required = false) String text,
+            @RequestParam(defaultValue = "0") int from,
+            @RequestParam(defaultValue = "20") int size) {
+        log.info("Получен GET запрос к /items/search с текстом: '{}' и пагинацией from={}, size={}", text, from, size);
+        return itemService.searchItems(text, from, size);
     }
 
     @PostMapping("/{itemId}/comment")

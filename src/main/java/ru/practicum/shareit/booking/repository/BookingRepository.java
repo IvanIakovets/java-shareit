@@ -1,11 +1,13 @@
 package ru.practicum.shareit.booking.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import ru.practicum.shareit.booking.dto.BookingResponseDto;
 import ru.practicum.shareit.booking.model.Booking;
 import ru.practicum.shareit.booking.model.BookingStatus;
 import ru.practicum.shareit.item.model.Item;
@@ -18,142 +20,45 @@ import java.util.Optional;
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
-    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
-            "b.id, " +
-            "b.start, " +
-            "b.end, " +
-            "b.status, " +
-            "new ru.practicum.shareit.booking.dto.BookerDto(b.booker.id, b.booker.username), " +
-            "new ru.practicum.shareit.booking.dto.ItemDto(b.item.id, b.item.name)) " +
-            "FROM Booking b " +
-            "WHERE b.booker.id = :userId " +
-            "ORDER BY b.start DESC")
-    List<BookingResponseDto> findAllByBookerIdDto(@Param("userId") Long userId);
+    @EntityGraph(attributePaths = {"item", "booker"})
+    Page<Booking> findByBookerId(Long bookerId, Pageable pageable);
 
-    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
-            "b.id, " +
-            "b.start, " +
-            "b.end, " +
-            "b.status, " +
-            "new ru.practicum.shareit.booking.dto.BookerDto(b.booker.id, b.booker.username), " +
-            "new ru.practicum.shareit.booking.dto.ItemDto(b.item.id, b.item.name)) " +
-            "FROM Booking b " +
-            "WHERE b.booker.id = :userId " +
-            "AND b.start <= :now AND b.end >= :now " +
-            "ORDER BY b.start DESC")
-    List<BookingResponseDto> findCurrentByBookerIdDto(@Param("userId") Long userId,
-                                                      @Param("now") LocalDateTime now);
+    @EntityGraph(attributePaths = {"item", "booker"})
+    Page<Booking> findByBookerIdAndStatus(Long bookerId, BookingStatus status, Pageable pageable);
 
-    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
-            "b.id, " +
-            "b.start, " +
-            "b.end, " +
-            "b.status, " +
-            "new ru.practicum.shareit.booking.dto.BookerDto(b.booker.id, b.booker.username), " +
-            "new ru.practicum.shareit.booking.dto.ItemDto(b.item.id, b.item.name)) " +
-            "FROM Booking b " +
-            "WHERE b.booker.id = :userId " +
-            "AND b.start > :now " +
-            "ORDER BY b.start DESC")
-    List<BookingResponseDto> findFutureByBookerIdDto(@Param("userId") Long userId,
-                                                     @Param("now") LocalDateTime now);
+    @EntityGraph(attributePaths = {"item", "booker"})
+    Page<Booking> findByBookerIdAndStartBeforeAndEndAfter(Long bookerId,
+                                                          LocalDateTime start,
+                                                          LocalDateTime end,
+                                                          Pageable pageable);
 
-    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
-            "b.id, " +
-            "b.start, " +
-            "b.end, " +
-            "b.status, " +
-            "new ru.practicum.shareit.booking.dto.BookerDto(b.booker.id, b.booker.username), " +
-            "new ru.practicum.shareit.booking.dto.ItemDto(b.item.id, b.item.name)) " +
-            "FROM Booking b " +
-            "WHERE b.booker.id = :userId " +
-            "AND b.end < :now " +
-            "ORDER BY b.start DESC")
-    List<BookingResponseDto> findPastByBookerIdDto(@Param("userId") Long userId,
-                                                   @Param("now") LocalDateTime now);
+    @EntityGraph(attributePaths = {"item", "booker"})
+    Page<Booking> findByBookerIdAndEndBefore(Long bookerId, LocalDateTime end, Pageable pageable);
 
-    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
-            "b.id, " +
-            "b.start, " +
-            "b.end, " +
-            "b.status, " +
-            "new ru.practicum.shareit.booking.dto.BookerDto(b.booker.id, b.booker.username), " +
-            "new ru.practicum.shareit.booking.dto.ItemDto(b.item.id, b.item.name)) " +
-            "FROM Booking b " +
-            "WHERE b.booker.id = :userId " +
-            "AND b.status = :status " +
-            "ORDER BY b.start DESC")
-    List<BookingResponseDto> findAllByBookerIdAndStatusDto(@Param("userId") Long userId,
-                                                           @Param("status") BookingStatus status);
+    @EntityGraph(attributePaths = {"item", "booker"})
+    Page<Booking> findByBookerIdAndStartAfter(Long bookerId, LocalDateTime start, Pageable pageable);
 
-    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
-            "b.id, " +
-            "b.start, " +
-            "b.end, " +
-            "b.status, " +
-            "new ru.practicum.shareit.booking.dto.BookerDto(b.booker.id, b.booker.username), " +
-            "new ru.practicum.shareit.booking.dto.ItemDto(b.item.id, b.item.name)) " +
-            "FROM Booking b " +
-            "WHERE b.item.owner.id = :userId " +
-            "ORDER BY b.start DESC")
-    List<BookingResponseDto> findAllByOwnerIdDto(@Param("userId") Long userId);
+    // ========== МЕТОДЫ ДЛЯ OWNER (С @EntityGraph ДЛЯ ПРЕДОТВРАЩЕНИЯ N+1) ==========
 
-    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
-            "b.id, " +
-            "b.start, " +
-            "b.end, " +
-            "b.status, " +
-            "new ru.practicum.shareit.booking.dto.BookerDto(b.booker.id, b.booker.username), " +
-            "new ru.practicum.shareit.booking.dto.ItemDto(b.item.id, b.item.name)) " +
-            "FROM Booking b " +
-            "WHERE b.item.owner.id = :userId " +
-            "AND b.start <= :now AND b.end >= :now " +
-            "ORDER BY b.start DESC")
-    List<BookingResponseDto> findCurrentByOwnerIdDto(@Param("userId") Long userId,
-                                                     @Param("now") LocalDateTime now);
+    @EntityGraph(attributePaths = {"item", "booker"})
+    Page<Booking> findByItemOwnerId(Long ownerId, Pageable pageable);
 
-    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
-            "b.id, " +
-            "b.start, " +
-            "b.end, " +
-            "b.status, " +
-            "new ru.practicum.shareit.booking.dto.BookerDto(b.booker.id, b.booker.username), " +
-            "new ru.practicum.shareit.booking.dto.ItemDto(b.item.id, b.item.name)) " +
-            "FROM Booking b " +
-            "WHERE b.item.owner.id = :userId " +
-            "AND b.start > :now " +
-            "ORDER BY b.start DESC")
-    List<BookingResponseDto> findFutureByOwnerIdDto(@Param("userId") Long userId,
-                                                    @Param("now") LocalDateTime now);
+    @EntityGraph(attributePaths = {"item", "booker"})
+    Page<Booking> findByItemOwnerIdAndStatus(Long ownerId, BookingStatus status, Pageable pageable);
 
-    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
-            "b.id, " +
-            "b.start, " +
-            "b.end, " +
-            "b.status, " +
-            "new ru.practicum.shareit.booking.dto.BookerDto(b.booker.id, b.booker.username), " +
-            "new ru.practicum.shareit.booking.dto.ItemDto(b.item.id, b.item.name)) " +
-            "FROM Booking b " +
-            "WHERE b.item.owner.id = :userId " +
-            "AND b.end < :now " +
-            "ORDER BY b.start DESC")
-    List<BookingResponseDto> findPastByOwnerIdDto(@Param("userId") Long userId,
-                                                  @Param("now") LocalDateTime now);
+    @EntityGraph(attributePaths = {"item", "booker"})
+    Page<Booking> findByItemOwnerIdAndStartBeforeAndEndAfter(Long ownerId,
+                                                             LocalDateTime start,
+                                                             LocalDateTime end,
+                                                             Pageable pageable);
 
-    @Query("SELECT new ru.practicum.shareit.booking.dto.BookingResponseDto(" +
-            "b.id, " +
-            "b.start, " +
-            "b.end, " +
-            "b.status, " +
-            "new ru.practicum.shareit.booking.dto.BookerDto(b.booker.id, b.booker.username), " +
-            "new ru.practicum.shareit.booking.dto.ItemDto(b.item.id, b.item.name)) " +
-            "FROM Booking b " +
-            "WHERE b.item.owner.id = :userId " +
-            "AND b.status = :status " +
-            "ORDER BY b.start DESC")
-    List<BookingResponseDto> findAllByOwnerIdAndStatusDto(@Param("userId") Long userId,
-                                                          @Param("status") BookingStatus status);
+    @EntityGraph(attributePaths = {"item", "booker"})
+    Page<Booking> findByItemOwnerIdAndEndBefore(Long ownerId, LocalDateTime end, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"item", "booker"})
+    Page<Booking> findByItemOwnerIdAndStartAfter(Long ownerId, LocalDateTime start, Pageable pageable);
+
+    // ========== СПЕЦИФИЧНЫЕ МЕТОДЫ (с @Query из-за сложности) ==========
 
     @Query("SELECT b FROM Booking b " +
             "JOIN FETCH b.item i " +
@@ -177,14 +82,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Optional<Booking> findNextApprovedBookingByItemId(@Param("itemId") Long itemId,
                                                       @Param("now") LocalDateTime now);
 
-    @Query("SELECT COUNT(b) > 0 FROM Booking b " +
-            "WHERE b.item.id = :itemId " +
-            "AND b.booker.id = :userId " +
-            "AND b.status = 'APPROVED' " +
-            "AND b.end < :now")
-    boolean existsCompletedRental(@Param("itemId") Long itemId,
-                                  @Param("userId") Long userId,
-                                  @Param("now") LocalDateTime now);
+    // ========== МЕТОДЫ ПРОВЕРКИ (без загрузки сущностей) ==========
 
     @Query("SELECT COUNT(b) > 0 FROM Booking b " +
             "WHERE b.item.id = :itemId " +
@@ -194,9 +92,22 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                                      @Param("startDate") LocalDateTime startDate,
                                      @Param("endDate") LocalDateTime endDate);
 
-    @Query(" select b " +
-            "from Booking b " +
-            "where b.item in ?1 " +
-            "  and b.status = 'APPROVED'")
-    List<Booking> findApprovedForItems(Collection<Item> items, Sort sort);
+    @Query("SELECT COUNT(b) > 0 FROM Booking b " +
+            "WHERE b.item.id = :itemId " +
+            "AND b.booker.id = :userId " +
+            "AND b.status = 'APPROVED' " +
+            "AND b.end < :now")
+    boolean existsCompletedRental(@Param("itemId") Long itemId,
+                                  @Param("userId") Long userId,
+                                  @Param("now") LocalDateTime now);
+
+    @Query("SELECT COUNT(i) > 0 FROM Item i WHERE i.owner.id = :ownerId")
+    boolean existsByOwnerId(@Param("ownerId") Long ownerId);
+
+    @Query("SELECT b FROM Booking b " +
+            "JOIN FETCH b.item i " +
+            "JOIN FETCH b.booker u " +
+            "WHERE b.item IN :items " +
+            "AND b.status = 'APPROVED'")
+    List<Booking> findApprovedForItems(@Param("items") Collection<Item> items, Sort sort);
 }

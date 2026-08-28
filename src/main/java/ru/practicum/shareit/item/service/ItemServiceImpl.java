@@ -2,6 +2,9 @@ package ru.practicum.shareit.item.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,9 +40,7 @@ public class ItemServiceImpl implements ItemService {
     public ItemResponseDto createItem(Long userId, ItemRequestDto itemDto) {
         log.info("Создание вещи для пользователя id: {}, название: {}", userId, itemDto.getName());
 
-        // проверка существования пользователя
         User user = userService.getUserById(userId);
-
         Item item = ItemMapper.toItem(itemDto, user);
         log.info("Вещь успешно создана с id: {}, владелец: {}", item.getId(), userId);
         itemRepository.save(item);
@@ -51,12 +52,12 @@ public class ItemServiceImpl implements ItemService {
     public ItemResponseDto updateItem(Long itemId, Long userId, ItemRequestDto itemDto) {
         log.info("Обновление вещи id: {} пользователем id: {}", itemId, userId);
 
-        // проверка существования вещи
         Item existingItem = getItem(itemId);
 
         // проверка владельца
         if (!existingItem.getOwner().getId().equals(userId)) {
-            log.warn("Пользователь {} попытался обновить вещь {} владельца {}", userId, itemId, existingItem.getOwner().getId());
+            log.warn("Пользователь {} попытался обновить вещь {} владельца {}", userId, itemId,
+                    existingItem.getOwner().getId());
             throw new AccessDeniedException("Пользователь " + userId + " не является собственником " + itemId);
         }
 
@@ -86,47 +87,37 @@ public class ItemServiceImpl implements ItemService {
         log.debug("Получение вещи по id: {}", id);
 
         Item item = getItem(id);
-
         return ItemMapper.toItemResponse(item);
     }
 
-    @Override
-    public List<ItemResponseDto> getAllUserItems(Long userId) {
-        log.info("Получение всех вещей для пользователя id: {}", userId);
+    public List<ItemResponseDto> getAllUserItems(Long userId, int from, int size) {
+        log.info("Получение всех вещей для пользователя id: {} с пагинацией from={}, size={}", userId, from, size);
 
-        // Проверка существования пользователя
         userService.getUserById(userId);
 
-        List<Item> userItems = itemRepository.findAllByOwnerId(userId);
+        Pageable pageable = PageRequest.of(from / size, size, Sort.by("id").ascending());
 
-        if (userItems.isEmpty()) {
+        // @EntityGraph уже загрузил все комментарии с авторами (N+1 решена!)
+        Page<Item> page = itemRepository.findAllByOwnerId(userId, pageable);
+
+        if (page.isEmpty()) {
             return Collections.emptyList();
         }
 
+        List<Item> userItems = page.getContent();
         LocalDateTime now = LocalDateTime.now();
 
-        // получаем все подтвержденные бронирования для этих вещей
+        // Получаем все подтвержденные бронирования для этих вещей
         List<Booking> approvedBookings = bookingRepository.findApprovedForItems(
                 userItems,
                 Sort.by(Sort.Direction.DESC, "start")
         );
 
-        // получаем все комментарии для этих вещей с авторами
-        List<Long> itemIds = userItems.stream()
-                .map(Item::getId)
-                .collect(Collectors.toList());
-
-        List<Comment> allComments = commentRepository.findAllByItemIdsWithAuthor(itemIds);
-
-        // группируем комментарии по вещам
-        Map<Long, List<Comment>> commentsByItemId = allComments.stream()
-                .collect(Collectors.groupingBy(comment -> comment.getItem().getId()));
-
-        // группируем бронирования по вещам
+        // Группируем бронирования по вещам
         Map<Long, List<Booking>> bookingsByItemId = approvedBookings.stream()
                 .collect(Collectors.groupingBy(booking -> booking.getItem().getId()));
 
-        // для каждой вещи определяем последнее и следующее бронирование
+        // Для каждой вещи определяем последнее и следующее бронирование
         Map<Long, Booking> lastBookingByItem = new HashMap<>();
         Map<Long, Booking> nextBookingByItem = new HashMap<>();
 
@@ -147,22 +138,23 @@ public class ItemServiceImpl implements ItemService {
             nextBookingByItem.put(itemId, nextBooking);
         }
 
-        // формируем DTO для каждой вещи
+        // Формируем DTO для каждой вещи
         return userItems.stream()
                 .map(item -> {
                     Booking lastBooking = lastBookingByItem.get(item.getId());
                     Booking nextBooking = nextBookingByItem.get(item.getId());
 
-                    List<Comment> itemComments = commentsByItemId.getOrDefault(
-                            item.getId(),
-                            Collections.emptyList()
-                    );
+                    // Комментарии уже загружены через @EntityGraph!
+                    List<Comment> itemComments = item.getComments();
+                    if (itemComments == null) {
+                        itemComments = Collections.emptyList();
+                    }
 
                     List<CommentResponseDto> commentDtos = itemComments.stream()
                             .map(comment -> new CommentResponseDto(
                                     comment.getId(),
                                     comment.getText(),
-                                    comment.getAuthor().getUsername(),
+                                    comment.getAuthor().getName(),  // уже загружен через @EntityGraph
                                     comment.getCreated()
                             ))
                             .collect(Collectors.toList());
@@ -175,43 +167,39 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    public List<ItemResponseDto> searchItems(String text) {
-        log.info("Поиск вещей по тексту: '{}'", text);
+    public List<ItemResponseDto> searchItems(String text, int from, int size) {
+        log.info("Поиск вещей по тексту: '{}' с пагинацией from={}, size={}", text, from, size);
 
-        // если текст пустой или null - возвращаем пустой список
         if (text == null || text.isBlank()) {
             log.debug("Текст поиска пуст, возвращаем пустой список");
             return List.of();
         }
 
-        List<Item> items = itemRepository.searchByText(text);
-        log.debug("Найдено {} вещей по тексту: '{}'", items.size(), text);
-        return items.stream()
+        Pageable pageable = PageRequest.of(from / size, size);
+        Page<Item> page = itemRepository.searchByText(text, pageable);
+
+        log.debug("Найдено {} вещей по тексту: '{}'", page.getTotalElements(), text);
+        return page.getContent().stream()
                 .map(ItemMapper::toItemResponse)
                 .collect(Collectors.toList());
     }
 
+    @Override
     @Transactional
     public CommentResponseDto addComment(Long itemId, Long userId, CommentRequestDto commentDto) {
         log.info("Добавление комментария к вещи id: {} пользователем id: {}", itemId, userId);
 
-        // Проверка существования вещи
         Item item = getItem(itemId);
-
-        // Проверка существования пользователя
         User user = userService.getUserById(userId);
 
-        // Проверка, что пользователь арендовал вещь и аренда завершена
         LocalDateTime now = LocalDateTime.now();
-        log.info("Проверка аренды: itemId={}, userId={}, now={}", itemId, userId, now);
         boolean hasCompletedRental = bookingRepository.existsCompletedRental(itemId, userId, now);
-        log.info("Результат проверки: {}", hasCompletedRental);
+
         if (!hasCompletedRental) {
             log.warn("Пользователь {} не арендовал вещь {} или аренда ещё не завершена", userId, itemId);
             throw new BadRequestException("Пользователь может оставить отзыв только после завершения аренды");
         }
 
-        // Создание комментария
         Comment comment = ItemMapper.toComment(commentDto, item, user);
         Comment savedComment = commentRepository.save(comment);
 
@@ -221,10 +209,12 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     @Transactional(readOnly = true)
-    public ItemResponseDto getItemWithDetails(Long itemId,  Long userId) {
+    public ItemResponseDto getItemWithDetails(Long itemId, Long userId) {
         log.debug("Получение вещи с деталями по id: {} для пользователя: {}", itemId, userId);
 
-        Item item = getItem(itemId);
+        // @EntityGraph уже загрузил комментарии с авторами (N+1 решена!)
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new NotFoundException("Вещь с id " + itemId + " не найдена"));
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -241,12 +231,19 @@ public class ItemServiceImpl implements ItemService {
                     .orElse(null);
         }
 
-        List<Comment> comments = commentRepository.findAllByItemIdOrderByCreatedAsc(itemId);
+        // Комментарии уже загружены через @EntityGraph!
+        List<Comment> comments = item.getComments();
+        if (comments == null) {
+            comments = Collections.emptyList();
+        }
+
         List<CommentResponseDto> commentDtos = comments.stream()
-                .map(comment -> {
-                    User author = userService.getUserById(comment.getAuthor().getId());
-                    return ItemMapper.toCommentResponse(comment, author);
-                })
+                .map(comment -> new CommentResponseDto(
+                        comment.getId(),
+                        comment.getText(),
+                        comment.getAuthor().getName(),  // уже загружен через @EntityGraph
+                        comment.getCreated()
+                ))
                 .collect(Collectors.toList());
 
         return ItemMapper.toItemResponseWithBookingsAndComments(
