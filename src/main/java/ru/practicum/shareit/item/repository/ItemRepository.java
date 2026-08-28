@@ -6,23 +6,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import ru.practicum.shareit.item.model.Item;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
 public interface ItemRepository extends JpaRepository<Item, Long> {
 
-    @Query("SELECT DISTINCT i FROM Item i " +
-            "LEFT JOIN FETCH i.comments c " +
-            "LEFT JOIN FETCH c.author a " +
-            "WHERE i.owner.id = :ownerId")
-    List<Item> findAllByOwnerIdWithComments(@Param("ownerId") Long ownerId);
-
     @Query("SELECT i FROM Item i WHERE i.owner.id = :ownerId")
     List<Item> findAllByOwnerId(@Param("ownerId") Long ownerId);
-
-    @Query("SELECT COUNT(i) > 0 FROM Item i WHERE i.owner.id = :ownerId")
-    boolean existsByOwnerId(@Param("ownerId") Long ownerId);
 
     @Query("SELECT i FROM Item i " +
             "WHERE i.available = true " +
