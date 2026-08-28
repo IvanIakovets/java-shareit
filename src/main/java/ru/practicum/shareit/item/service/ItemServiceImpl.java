@@ -2,6 +2,7 @@ package ru.practicum.shareit.item.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.model.Booking;
@@ -18,9 +19,7 @@ import ru.practicum.shareit.user.model.User;
 import ru.practicum.shareit.user.service.UserService;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -39,9 +38,9 @@ public class ItemServiceImpl implements ItemService {
         log.info("Создание вещи для пользователя id: {}, название: {}", userId, itemDto.getName());
 
         // проверка существования пользователя
-        userService.getUserById(userId);
+        User user = userService.getUserById(userId);
 
-        Item item = ItemMapper.toItem(itemDto, userId);
+        Item item = ItemMapper.toItem(itemDto, user);
         log.info("Вещь успешно создана с id: {}, владелец: {}", item.getId(), userId);
         itemRepository.save(item);
 
@@ -56,8 +55,8 @@ public class ItemServiceImpl implements ItemService {
         Item existingItem = getItem(itemId);
 
         // проверка владельца
-        if (!existingItem.getOwnerId().equals(userId)) {
-            log.warn("Пользователь {} попытался обновить вещь {} владельца {}", userId, itemId, existingItem.getOwnerId());
+        if (!existingItem.getOwner().getId().equals(userId)) {
+            log.warn("Пользователь {} попытался обновить вещь {} владельца {}", userId, itemId, existingItem.getOwner().getId());
             throw new AccessDeniedException("Пользователь " + userId + " не является собственником " + itemId);
         }
 
@@ -95,72 +94,82 @@ public class ItemServiceImpl implements ItemService {
     public List<ItemResponseDto> getAllUserItems(Long userId) {
         log.info("Получение всех вещей для пользователя id: {}", userId);
 
-        // проверка существования пользователя
+        // Проверка существования пользователя
         userService.getUserById(userId);
 
-        LocalDateTime now = LocalDateTime.now();
+        List<Item> userItems = itemRepository.findAllByOwnerId(userId);
 
-        List<Object[]> results = itemRepository.findItemsWithLastAndNextBookings(userId, now);
-
-        if (results.isEmpty()) {
+        if (userItems.isEmpty()) {
             return Collections.emptyList();
         }
 
-        List<Long> itemIds = results.stream()
-                .map(row -> ((Item) row[0]).getId())
+        LocalDateTime now = LocalDateTime.now();
+
+        // получаем все подтвержденные бронирования для этих вещей
+        List<Booking> approvedBookings = bookingRepository.findApprovedForItems(
+                userItems,
+                Sort.by(Sort.Direction.DESC, "start")
+        );
+
+        // получаем все комментарии для этих вещей с авторами
+        List<Long> itemIds = userItems.stream()
+                .map(Item::getId)
                 .collect(Collectors.toList());
 
-        List<Comment> allComments = commentRepository.findAllByItemIds(itemIds);
+        List<Comment> allComments = commentRepository.findAllByItemIdsWithAuthor(itemIds);
 
+        // группируем комментарии по вещам
         Map<Long, List<Comment>> commentsByItemId = allComments.stream()
-                .collect(Collectors.groupingBy(Comment::getItemId));
+                .collect(Collectors.groupingBy(comment -> comment.getItem().getId()));
 
-        List<Long> authorIds = allComments.stream()
-                .map(Comment::getAuthorId)
-                .distinct()
-                .collect(Collectors.toList());
+        // группируем бронирования по вещам
+        Map<Long, List<Booking>> bookingsByItemId = approvedBookings.stream()
+                .collect(Collectors.groupingBy(booking -> booking.getItem().getId()));
 
-        Map<Long, User> usersById = userService.getUsersByIds(authorIds);
+        // для каждой вещи определяем последнее и следующее бронирование
+        Map<Long, Booking> lastBookingByItem = new HashMap<>();
+        Map<Long, Booking> nextBookingByItem = new HashMap<>();
 
-        return results.stream()
-                .map(row -> {
-                    Item item = (Item) row[0];
+        for (Map.Entry<Long, List<Booking>> entry : bookingsByItemId.entrySet()) {
+            Long itemId = entry.getKey();
+            List<Booking> bookings = entry.getValue();
 
-                    // Данные о последнем бронировании
-                    Long lastBookingId = (Long) row[1];
-                    Long lastBookerId = (Long) row[2];
-                    LocalDateTime lastStartDate = (LocalDateTime) row[3];
-                    LocalDateTime lastEndDate = (LocalDateTime) row[4];
+            Booking lastBooking = bookings.stream()
+                    .filter(b -> b.getEnd().isBefore(now))
+                    .max(Comparator.comparing(Booking::getEnd))
+                    .orElse(null);
+            lastBookingByItem.put(itemId, lastBooking);
 
-                    // Данные о следующем бронировании
-                    Long nextBookingId = (Long) row[5];
-                    Long nextBookerId = (Long) row[6];
-                    LocalDateTime nextStartDate = (LocalDateTime) row[7];
-                    LocalDateTime nextEndDate = (LocalDateTime) row[8];
+            Booking nextBooking = bookings.stream()
+                    .filter(b -> b.getStart().isAfter(now))
+                    .min(Comparator.comparing(Booking::getStart))
+                    .orElse(null);
+            nextBookingByItem.put(itemId, nextBooking);
+        }
 
-                    // Формируем DTO для бронирований
-                    BookingInfoDto lastBookingDto = lastBookingId != null
-                            ? new BookingInfoDto(lastBookingId, lastBookerId, lastStartDate, lastEndDate)
-                            : null;
+        // формируем DTO для каждой вещи
+        return userItems.stream()
+                .map(item -> {
+                    Booking lastBooking = lastBookingByItem.get(item.getId());
+                    Booking nextBooking = nextBookingByItem.get(item.getId());
 
-                    BookingInfoDto nextBookingDto = nextBookingId != null
-                            ? new BookingInfoDto(nextBookingId, nextBookerId, nextStartDate, nextEndDate)
-                            : null;
+                    List<Comment> itemComments = commentsByItemId.getOrDefault(
+                            item.getId(),
+                            Collections.emptyList()
+                    );
 
-                    // Получаем комментарии для текущей вещи
-                    List<Comment> itemComments = commentsByItemId.getOrDefault(item.getId(), Collections.emptyList());
-
-                    // Преобразуем комментарии в DTO
                     List<CommentResponseDto> commentDtos = itemComments.stream()
-                            .map(comment -> {
-                                User author = usersById.get(comment.getAuthorId());
-                                return ItemMapper.toCommentResponse(comment, author);
-                            })
+                            .map(comment -> new CommentResponseDto(
+                                    comment.getId(),
+                                    comment.getText(),
+                                    comment.getAuthor().getUsername(),
+                                    comment.getCreated()
+                            ))
                             .collect(Collectors.toList());
 
-                    // Формируем ItemResponseDto через существующий маппер
-                    return ItemMapper.toItemResponseWithBookingInfo(
-                            item, lastBookingDto, nextBookingDto, commentDtos);
+                    return ItemMapper.toItemResponseWithBookingsAndComments(
+                            item, lastBooking, nextBooking, commentDtos
+                    );
                 })
                 .collect(Collectors.toList());
     }
@@ -187,7 +196,7 @@ public class ItemServiceImpl implements ItemService {
         log.info("Добавление комментария к вещи id: {} пользователем id: {}", itemId, userId);
 
         // Проверка существования вещи
-        getItem(itemId);
+        Item item = getItem(itemId);
 
         // Проверка существования пользователя
         User user = userService.getUserById(userId);
@@ -203,7 +212,7 @@ public class ItemServiceImpl implements ItemService {
         }
 
         // Создание комментария
-        Comment comment = ItemMapper.toComment(commentDto, itemId, userId);
+        Comment comment = ItemMapper.toComment(commentDto, item, user);
         Comment savedComment = commentRepository.save(comment);
 
         log.info("Комментарий успешно добавлен к вещи {} пользователем {}", itemId, userId);
@@ -222,7 +231,7 @@ public class ItemServiceImpl implements ItemService {
         Booking lastBooking = null;
         Booking nextBooking = null;
 
-        if (item.getOwnerId().equals(userId)) {
+        if (item.getOwner().getId().equals(userId)) {
             lastBooking = bookingRepository
                     .findLastApprovedBookingByItemId(item.getId(), now)
                     .orElse(null);
@@ -235,7 +244,7 @@ public class ItemServiceImpl implements ItemService {
         List<Comment> comments = commentRepository.findAllByItemIdOrderByCreatedAsc(itemId);
         List<CommentResponseDto> commentDtos = comments.stream()
                 .map(comment -> {
-                    User author = userService.getUserById(comment.getAuthorId());
+                    User author = userService.getUserById(comment.getAuthor().getId());
                     return ItemMapper.toCommentResponse(comment, author);
                 })
                 .collect(Collectors.toList());

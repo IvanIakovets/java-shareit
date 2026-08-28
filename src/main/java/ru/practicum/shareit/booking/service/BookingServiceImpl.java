@@ -42,7 +42,7 @@ public class BookingServiceImpl implements BookingService {
 
         Item item = itemService.getItem(bookingDto.getItemId());
 
-        if (item.getOwnerId().equals(userId)) {
+        if (item.getOwner().getId().equals(userId)) {
             log.warn("Пользователь {} попытался забронировать свою вещь {}", userId, item.getId());
             throw new AccessDeniedException("Владелец не может бронировать свою вещь");
         }
@@ -76,8 +76,8 @@ public class BookingServiceImpl implements BookingService {
                 null,
                 bookingDto.getStart(),
                 bookingDto.getEnd(),
-                bookingDto.getItemId(),
-                userId,
+                item,
+                user,
                 BookingStatus.WAITING
         );
 
@@ -92,10 +92,10 @@ public class BookingServiceImpl implements BookingService {
         log.info("Подтверждение/отклонение бронирования id: {} пользователем id: {}", bookingId, userId);
 
         Booking booking = getBookingByIdInternal(bookingId);
-        Item item = itemService.getItem(booking.getItemId());
+        Item item = booking.getItem();
 
 
-        if (!item.getOwnerId().equals(userId)) {
+        if (!item.getOwner().getId().equals(userId)) {
             log.warn("Пользователь {} не является владельцем вещи {}", userId, item.getId());
             throw new AccessDeniedException("Только владелец может подтверждать или отклонять бронирование");
         }
@@ -108,7 +108,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setStatus(approved ? BookingStatus.APPROVED : BookingStatus.REJECTED);
 
         Booking updatedBooking = bookingRepository.save(booking);
-        User user = userService.getUserById(updatedBooking.getBookerId());
+        User user = updatedBooking.getBooker();
         log.info("Бронирование {} обновлено на статус: {}", bookingId, updatedBooking.getStatus());
         return BookingMapper.toResponse(updatedBooking, item, user);
     }
@@ -118,10 +118,10 @@ public class BookingServiceImpl implements BookingService {
         log.info("Получение бронирования id: {} пользователем id: {}", bookingId, userId);
 
         Booking booking = getBookingByIdInternal(bookingId);
-        Item item = itemService.getItem(booking.getItemId());
+        Item item = booking.getItem();
         User user = userService.getUserById(userId);
 
-        if (!booking.getBookerId().equals(userId) && !item.getOwnerId().equals(userId)) {
+        if (!booking.getBooker().getId().equals(userId) && !item.getOwner().getId().equals(userId)) {
             log.warn("Пользователь {} не имеет прав на просмотр бронирования {}", userId, bookingId);
             throw new AccessDeniedException("Только автор бронирования или владелец вещи могут просматривать бронирование");
         }
