@@ -110,4 +110,5 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             "WHERE b.item IN :items " +
             "AND b.status = 'APPROVED'")
     List<Booking> findApprovedForItems(@Param("items") Collection<Item> items, Sort sort);
+
 }
