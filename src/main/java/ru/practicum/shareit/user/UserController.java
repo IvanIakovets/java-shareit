@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import ru.practicum.shareit.user.dto.UserMapper;
 import ru.practicum.shareit.user.dto.UserRequestDto;
 import ru.practicum.shareit.user.dto.UserResponseDto;
+import ru.practicum.shareit.user.model.User;
 import ru.practicum.shareit.user.service.UserService;
 import ru.practicum.shareit.validation.ValidationGroups;
 
@@ -34,7 +35,6 @@ public class UserController {
     }
 
     @GetMapping
-    @ResponseStatus(HttpStatus.OK)
     public List<UserResponseDto> getAll() {
         log.info("Получен GET запрос к /users");
 
@@ -46,7 +46,6 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @ResponseStatus(HttpStatus.OK)
     public UserResponseDto getById(@PathVariable Long id) {
         log.info("Получен GET запрос к /users/{}", id);
 
@@ -55,7 +54,6 @@ public class UserController {
     }
 
     @PatchMapping("/{id}")
-    @ResponseStatus(HttpStatus.OK)
     public UserResponseDto update(@PathVariable Long id,
                                           @Validated(ValidationGroups.Update.class) @RequestBody UserRequestDto userDto) {
         log.info("Получен PATCH запрос к /users/{}", id);

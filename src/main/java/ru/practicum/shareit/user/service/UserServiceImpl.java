@@ -3,23 +3,28 @@ package ru.practicum.shareit.user.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.exception.ConflictException;
 import ru.practicum.shareit.exception.NotFoundException;
-import ru.practicum.shareit.user.User;
-import ru.practicum.shareit.user.UserRepository;
+import ru.practicum.shareit.user.model.User;
+import ru.practicum.shareit.user.repository.UserRepository;
 import ru.practicum.shareit.user.dto.UserMapper;
 import ru.practicum.shareit.user.dto.UserRequestDto;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
 
     @Override
+    @Transactional
     public User createUser(UserRequestDto userDto) {
         log.info("Создание пользователя с email: {}", userDto.getEmail());
 
@@ -35,6 +40,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public User updateUser(Long id, UserRequestDto userDto) {
         log.info("Обновление пользователя с id: {}", id);
 
@@ -48,29 +54,23 @@ public class UserServiceImpl implements UserService {
         }
 
         if (userDto.getEmail() != null) {
-            // проверка уникальности email при обновлении
-            if (userRepository.existsByEmailAndIdNot(userDto.getEmail(), id)) {
-                log.warn("Невозможно обновить email пользователя {} на {}: уже существует", id, userDto.getEmail());
-                throw new ConflictException("Пользователь с таким email " + userDto.getEmail() + " уже существует");
-            }
             log.debug("Обновление email пользователя {} с '{}' на '{}'", id, existingUser.getEmail(), userDto.getEmail());
             existingUser.setEmail(userDto.getEmail());
         }
 
         log.info("Пользователь {} успешно обновлен", id);
-        return userRepository.update(existingUser);
+        return userRepository.save(existingUser);
     }
 
     @Override
     public User getUserById(Long id) {
         log.debug("Получение пользователя по id: {}", id);
 
-        Optional<User> user = userRepository.findById(id);
-        if (user.isEmpty()) {
-            log.warn("Пользователь с id {} не найден", id);
-            throw new NotFoundException("Пользователь с таким " + id + " не найден");
-        }
-        return user.get();
+        return userRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.warn("Пользователь с id {} не найден", id);
+                    return new NotFoundException("Пользователь с таким " + id + " не найден");
+                });
     }
 
     @Override
@@ -83,6 +83,15 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(Long id) {
         log.info("Удаление пользователя с id: {}", id);
         getUserById(id);
-        userRepository.delete(id);
+        userRepository.deleteById(id);
+    }
+
+    @Override
+    public Map<Long, User> getUsersByIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, user -> user));
     }
 }
